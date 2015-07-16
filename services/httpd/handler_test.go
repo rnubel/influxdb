@@ -223,12 +223,12 @@ func TestHandler_Query_ErrInvalidQuery(t *testing.T) {
 // Ensure the handler returns a status 401 if the user is not authorized.
 func TestHandler_Query_ErrUnauthorized(t *testing.T) {
 	h := NewHandler(false)
-	h.QueryExecutor.ExecuteQueryFn = func(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
-		return nil, meta.NewAuthError("marker")
+	h.QueryExecutor.AuthorizeFn = func(u *meta.UserInfo, q *influxql.Query, db string) error {
+		return errors.New("marker")
 	}
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?db=foo&q=SHOW+SERIES+FROM+bar", nil))
+	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?u=bar&db=foo&q=SHOW+SERIES+FROM+bar", nil))
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("unexpected status: %d", w.Code)
 	}
@@ -264,6 +264,7 @@ func TestHandler_Query_ErrResult(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // Ensure the handler returns a status 401 if an auth error is returned from the result.
 func TestHandler_Query_Result_ErrUnauthorized(t *testing.T) {
 	h := NewHandler(false)
@@ -330,6 +331,8 @@ func TestHandler_Mapper_ShardDoesNotExist(t *testing.T) {
 	}
 }
 
+=======
+>>>>>>> Wire tsdb.Authorize back into query handler
 func TestMarshalJSON_NoPretty(t *testing.T) {
 	if b := httpd.MarshalJSON(struct {
 		Name string `json:"name"`
@@ -462,7 +465,12 @@ func (s *HandlerMetaStore) Users() ([]meta.UserInfo, error) {
 
 // HandlerQueryExecutor is a mock implementation of Handler.QueryExecutor.
 type HandlerQueryExecutor struct {
+	AuthorizeFn    func(u *meta.UserInfo, q *influxql.Query, db string) error
 	ExecuteQueryFn func(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error)
+}
+
+func (e *HandlerQueryExecutor) Authorize(u *meta.UserInfo, q *influxql.Query, db string) error {
+	return e.AuthorizeFn(u, q, db)
 }
 
 func (e *HandlerQueryExecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
